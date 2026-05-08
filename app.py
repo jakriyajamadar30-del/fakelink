@@ -1,11 +1,8 @@
-from flask import Flask, request
-
+from flask import Flask, render_template_string, request
+import pandas as pd
 from sklearn.feature_extraction.text import TfidfVectorizer
 from sklearn.linear_model import LogisticRegression
-
 from urllib.parse import urlparse
-
-import pandas as pd
 import re
 
 app = Flask(__name__)
@@ -14,88 +11,41 @@ app = Flask(__name__)
 
 data = {
 
-"url":[
+    "url":[
 
-# SAFE
 "https://google.com",
 "https://gmail.com",
 "https://youtube.com",
 "https://github.com",
 "https://amazon.in",
-"https://wikipedia.org",
-"https://linkedin.com",
 "https://microsoft.com",
-"https://apple.com",
 "https://openai.com",
 "https://paypal.com",
-"https://instagram.com",
 "https://facebook.com",
-"https://twitter.com",
-"https://reddit.com",
-"https://flipkart.com",
-"https://spotify.com",
-"https://whatsapp.com",
-"https://telegram.org",
-"https://zoom.us",
+"https://instagram.com",
 "https://python.org",
-"https://bbc.com",
-"https://mahanmk.com",
 
-# FAKE
 "https://mircosoft.com",
-"https://micros0ft.com",
-"https://rnicrosoft.com",
 "https://g00gle.com",
-"https://faceb00k.com",
 "https://paypa1.com",
 
-# PHISHING
 "https://google-login-warning.com",
 "https://google-account-security.xyz",
-"https://gmail-password-reset-alert.net",
-"https://youtube-premium-free.xyz",
-"https://github-security-check.net",
-"https://amazon-prize-claim.com",
-"https://amazon-login-security.net",
-"https://linkedin-account-warning.net",
-"https://microsoft-security-account.com",
 "https://paypal-secure-login.com",
-"https://instagram-followers-free.xyz",
-"https://facebook-security-alert.net",
-"https://bank-login-warning.net",
-"https://verify-account-security.net",
-"https://claim-prize-now.xyz",
-"https://secure-login-bank.com",
-"https://google-free-reward.xyz",
-"https://paypal-account-update.com",
-"https://spotify-free-premium.xyz",
-"https://telegram-security-alert.net",
+"https://amazon-prize-claim.com",
 "https://free-mobile-recharge.xyz",
-"https://crypto-free-gift.net",
-"https://google.verify-login-alert.com",
-"https://paypal.verify-account-security.com",
-"https://google---security---warning.xyz",
-"https://amazon--secure-login.net",
-"https://github_account_verify.xyz",
-"https://login-free-reward-security.net",
-"https://paypal@security-alert.com"
+"https://verify-account-security.net",
 
 ],
 
 "label":[
 
-# SAFE
-0,0,0,0,0,0,0,0,0,0,
-0,0,0,0,0,0,0,0,0,0,
-0,0,0,
+0,0,0,0,0,0,0,0,0,0,0,
 
-# FAKE
-1,1,1,1,1,1,
+1,1,1,
 
-# PHISHING
-1,1,1,1,1,1,1,1,1,1,
-1,1,1,1,1,1,1,1,1,1,
-1,1,1,1,1,1,1,1,1,1
+1,1,1,1,1,1
+
 ]
 
 }
@@ -118,73 +68,16 @@ model.fit(X, df["label"])
 # ---------------- TRUSTED DOMAINS ----------------
 
 trusted_domains = [
-
-"google.com",
-"youtube.com",
-"github.com",
-"amazon.in",
-"microsoft.com",
-"apple.com",
-"paypal.com",
-"facebook.com",
-"instagram.com",
-"openai.com",
-"python.org",
-"mahanmk.com",
-"microsoftonline.com",
-"login.microsoftonline.com",
-"goo.gl",
-"goo.gle"
-
-]
-
-# ---------------- SUSPICIOUS WORDS ----------------
-
-suspicious_words = [
-
-"login",
-"verify",
-"security",
-"claim",
-"free",
-"warning",
-"reward",
-"alert",
-"gift",
-"premium",
-"billing",
-"reset",
-"password",
-"otp",
-"bonus",
-"win",
-"prize",
-"account",
-"secure"
-
-]
-
-# ---------------- DANGEROUS DOMAINS ----------------
-
-dangerous_domains = [
-
-".xyz",
-".tk",
-".top",
-".gq",
-".test"
-
-]
-
-# ---------------- URL SHORTENERS ----------------
-
-shorteners = [
-
-"bit.ly",
-"tinyurl.com",
-"goo.gl",
-"t.co"
-
+    "google.com",
+    "youtube.com",
+    "github.com",
+    "amazon.in",
+    "microsoft.com",
+    "paypal.com",
+    "facebook.com",
+    "instagram.com",
+    "openai.com",
+    "python.org"
 ]
 
 # ---------------- PHISHING SCORE ----------------
@@ -193,270 +86,218 @@ def phishing_score(url):
 
     score = 0
 
-    url_lower = url.lower()
+    parsed = urlparse(url.lower())
 
-    parsed = urlparse(url_lower)
+    domain = parsed.netloc.replace("www.", "")
 
-    domain = parsed.netloc.replace("www.","")
+    suspicious_words = [
+        "login",
+        "verify",
+        "security",
+        "free",
+        "reward",
+        "claim",
+        "warning",
+        "password",
+        "otp"
+    ]
 
-    path = parsed.path.lower()
-
-    # TRUSTED GOOGLE MAPS
-    if domain in ["goo.gl","goo.gle"]:
-
-        if "/maps/" in url_lower:
-            return 0
-
-    # TRUSTED DOMAINS
-    if domain in trusted_domains:
-        return 0
-
-    for trusted in trusted_domains:
-
-        if domain.endswith("." + trusted):
-            return 0
-
-    # SUSPICIOUS WORDS
     for word in suspicious_words:
 
         if word in domain:
+            score += 3
 
-            if word in ["login","verify","password","otp"]:
-                score += 4
-
-            else:
-                score += 2
-
-    # SUSPICIOUS PATH
-    for word in suspicious_words:
-
-        if word in path:
-            score += 1
-
-    # HYPHENS
-    hyphen_count = domain.count("-")
-
-    if hyphen_count == 1:
-        score += 1
-
-    elif hyphen_count == 2:
-        score += 3
-
-    elif hyphen_count >= 3:
-        score += 5
-
-    # DOUBLE HYPHENS
-    if "--" in domain:
+    if ".xyz" in domain:
         score += 6
 
-    # TRIPLE HYPHENS
-    if "---" in domain:
-        score += 8
-
-    # MANY DOTS
-    dot_count = domain.count(".")
-
-    if dot_count >= 3:
-        score += 4
-
-    # UNDERSCORE
-    if "_" in domain:
+    if "--" in domain:
         score += 5
 
-    # @ SYMBOL
-    if "@" in url_lower:
-        score += 10
+    if "@" in url:
+        score += 8
 
-    # DANGEROUS DOMAINS
-    for d in dangerous_domains:
-
-        if domain.endswith(d):
-            score += 7
-
-    # SHORTENERS
-    for short in shorteners:
-
-        if short in domain:
-            score += 2
-
-    # DANGEROUS FILES
-    dangerous_files = [
-
-        ".exe",
-        ".apk",
-        ".bat",
-        ".zip"
-
-    ]
-
-    for file in dangerous_files:
-
-        if file in path:
-            score += 7
-
-    # IP ADDRESS
     if re.search(r"\d+\.\d+\.\d+\.\d+", domain):
         score += 10
 
-    # FAKE TRUSTED BRANDS
-    for trusted in trusted_domains:
-
-        brand = trusted.split(".")[0]
-
-        if brand in domain:
-
-            if domain != trusted and not domain.endswith("." + trusted):
-                score += 8
-
-        if brand.replace("o","0") in domain:
-            score += 8
-
-        if brand.replace("m","rn") in domain:
-            score += 8
-
-        if brand.replace("l","1") in domain:
-            score += 8
-
     return score
 
-# ---------------- HTML PAGE ----------------
+# ---------------- HTML + CSS ----------------
 
 HTML = """
 
 <!DOCTYPE html>
-
 <html>
 
 <head>
 
 <title>Link Detector</title>
 
+<meta name="viewport"
+content="width=device-width, initial-scale=1.0">
+
+<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+
 <style>
+
+*{
+    margin:0;
+    padding:0;
+    box-sizing:border-box;
+}
 
 body{
 
-margin:0;
-padding:0;
-height:100vh;
+    min-height:100vh;
 
-display:flex;
-justify-content:center;
-align-items:center;
+    display:flex;
+    justify-content:center;
+    align-items:center;
 
-font-family:Arial;
+    font-family:Arial, sans-serif;
 
-background:linear-gradient(
-135deg,
-#0f2027,
-#203a43,
-#2c5364
-);
-
+    background:
+    linear-gradient(
+        135deg,
+        #0f2027,
+        #203a43,
+        #2c5364
+    );
 }
 
 .container{
 
-background:white;
+    width:90%;
+    max-width:520px;
 
-padding:35px;
+    padding:35px;
 
-width:500px;
+    border-radius:25px;
 
-border-radius:18px;
+    background:rgba(255,255,255,0.12);
 
-text-align:center;
+    backdrop-filter:blur(18px);
 
-box-shadow:0 12px 30px rgba(0,0,0,0.3);
+    border:1px solid rgba(255,255,255,0.2);
 
+    box-shadow:
+    0 10px 40px rgba(0,0,0,0.35);
+
+    text-align:center;
 }
 
 h1{
 
-font-size:34px;
-margin-bottom:25px;
+    color:white;
 
+    margin-bottom:25px;
+
+    font-size:34px;
 }
 
 input{
 
-width:100%;
+    width:100%;
 
-padding:14px;
+    padding:15px;
 
-font-size:18px;
+    border:none;
 
-border-radius:10px;
+    border-radius:14px;
 
-border:1px solid #ccc;
+    outline:none;
 
-margin-bottom:18px;
+    font-size:17px;
 
-box-sizing:border-box;
-
+    margin-bottom:20px;
 }
 
 button{
 
-width:100%;
+    width:100%;
 
-padding:14px;
+    padding:15px;
 
-font-size:20px;
+    border:none;
 
-border:none;
+    border-radius:14px;
 
-border-radius:10px;
+    font-size:18px;
 
-cursor:pointer;
+    font-weight:bold;
 
-background:linear-gradient(
-90deg,
-#0072ff,
-#0052d4
-);
+    color:white;
 
-color:white;
+    cursor:pointer;
 
+    background:
+    linear-gradient(
+        90deg,
+        #00c6ff,
+        #0072ff
+    );
+}
+
+button:hover{
+
+    opacity:0.9;
+}
+
+#resultBox{
+
+    margin-top:28px;
+}
+
+.safe,
+.danger,
+.invalid{
+
+    padding:18px;
+
+    border-radius:16px;
+
+    font-size:24px;
+
+    font-weight:bold;
+
+    color:white;
+
+    margin-bottom:12px;
 }
 
 .safe{
 
-color:green;
-
-font-size:24px;
-
-font-weight:bold;
-
+    background:#16a34a;
 }
 
 .danger{
 
-color:red;
-
-font-size:24px;
-
-font-weight:bold;
-
+    background:#dc2626;
 }
 
 .invalid{
 
-color:red;
-
-font-size:24px;
-
-font-weight:bold;
-
+    background:#f59e0b;
 }
 
 .message{
 
-font-size:18px;
+    font-size:18px;
 
-font-weight:bold;
+    font-weight:bold;
 
-margin-top:10px;
+    color:white;
 
+    margin-top:10px;
+}
+
+canvas{
+
+    margin-top:25px !important;
+
+    max-width:280px;
+
+    margin-left:auto;
+    margin-right:auto;
 }
 
 </style>
@@ -474,48 +315,100 @@ margin-top:10px;
 <input
 type="text"
 name="url"
+value="{{ url }}"
 placeholder="Enter website link here..."
 required
 >
 
 <button type="submit">
-
 SCAN LINK
-
 </button>
 
 </form>
 
-RESULT_BOX
+<div id="resultBox">
+
+{% if result %}
+
+<div class="
+{% if 'SAFE' in result %}
+safe
+{% elif 'PHISHING' in result %}
+danger
+{% else %}
+invalid
+{% endif %}
+">
+
+{{ result }}
 
 </div>
 
-</body>
+<div class="message">
 
+{{ message }}
+
+</div>
+
+<canvas id="riskChart"></canvas>
+
+{% endif %}
+
+</div>
+
+</div>
+
+<script>
+
+const score = {{ score|default(0) }};
+
+if(score > 0){
+
+    const ctx =
+    document.getElementById('riskChart');
+
+    new Chart(ctx, {
+
+        type: 'pie',
+
+        data: {
+
+            labels: ['Risk', 'Safe'],
+
+            datasets: [{
+
+                data: [score, 20-score]
+
+            }]
+        }
+    });
+}
+
+</script>
+
+</body>
 </html>
 
 """
 
 # ---------------- FLASK ----------------
 
-@app.route("/", methods=["GET","POST"])
+@app.route("/", methods=["GET", "POST"])
 
 def home():
 
-    result_html = ""
+    result = ""
+    message = ""
+    url = ""
+    risk_score = 0
 
     if request.method == "POST":
 
-        original_url = request.form["url"].strip()
+        url = request.form["url"].strip()
 
-        url = original_url
-
-        # AUTO HTTPS
         if not url.startswith("http://") and not url.startswith("https://"):
-
             url = "https://" + url
 
-        # VALIDATION
         domain_check = re.match(
             r"^https?://[A-Za-z0-9._@%/\-=]+\.[A-Za-z]{2,}",
             url
@@ -523,136 +416,52 @@ def home():
 
         if not domain_check:
 
-            result = "⚠️ Link is INVALID"
-
-            message = "Enter valid website link"
-
-            css = "invalid"
+            result = "⚠️ INVALID LINK"
+            message = "Enter valid website URL"
 
         else:
 
             parsed = urlparse(url)
 
-            domain = parsed.netloc.replace("www.","")
+            domain = parsed.netloc.replace("www.", "")
 
-            # ML PREDICTION
             X_test = vectorizer.transform([url])
 
             probability = model.predict_proba(X_test)[0][1]
 
-            # PHISHING SCORE
             risk_score = phishing_score(url)
 
-            # SAFE EXTENSIONS
-            safe_extensions = [
+            trusted = False
 
-                ".gov.in",
-                ".edu",
-                ".org",
-                ".ac.in"
+            for d in trusted_domains:
 
-            ]
+                if domain == d or domain.endswith("." + d):
+                    trusted = True
 
-            for ext in safe_extensions:
+            if probability >= 0.80 or risk_score >= 6:
 
-                if domain.endswith(ext):
-                    risk_score -= 2
+                result = "⚠️ WARNING : PHISHING LINK"
+                message = "❌ Do NOT open this link"
 
-            if risk_score < 0:
-                risk_score = 0
+            elif trusted:
 
-            # TRUSTED SUBDOMAIN
-            trusted_subdomain = False
-
-            for trusted in trusted_domains:
-
-                if domain == trusted or domain.endswith("." + trusted):
-
-                    trusted_subdomain = True
-
-                    break
-
-            # DANGEROUS PATTERN
-            dangerous_pattern = (
-
-                "@" in url
-                or ".xyz" in domain
-                or "--" in domain
-                or "login" in domain
-                or "verify" in domain
-                or "password" in domain
-                or "otp" in domain
-
-            )
-
-            # FINAL DETECTION
-            if (
-
-                probability >= 0.90
-
-                or
-
-                (probability >= 0.70 and risk_score >= 5)
-
-                or
-
-                risk_score >= 8
-
-                or
-
-                (dangerous_pattern and risk_score >= 5)
-
-            ):
-
-                result = "⚠️ Warning - Link is PHISHING"
-
-                message = "❌ Do NOT click this link"
-
-                css = "danger"
-
-            elif (
-
-                trusted_subdomain
-
-                or
-
-                (
-                    probability < 0.50
-                    and risk_score <= 3
-                )
-
-            ):
-
-                result = "👍 Link is SAFE"
-
-                message = "Secure to browse or click"
-
-                css = "safe"
+                result = "✅ LINK IS SAFE"
+                message = "Secure website detected"
 
             else:
 
-                result = "⚠️ Warning - Link is PHISHING"
+                result = "⚠️ SUSPICIOUS LINK"
+                message = "Proceed carefully"
 
-                message = "❌ Do NOT click this link"
-
-                css = "danger"
-
-        result_html = f'''
-
-        <div class="{css}">
-        {result}
-        </div>
-
-        <div class="message">
-        {message}
-        </div>
-
-        '''
-
-    return HTML.replace("RESULT_BOX", result_html)
+    return render_template_string(
+        HTML,
+        result=result,
+        message=message,
+        score=risk_score,
+        url=url
+    )
 
 # ---------------- RUN ----------------
 
 if __name__ == "__main__":
-
     app.run(debug=True)
